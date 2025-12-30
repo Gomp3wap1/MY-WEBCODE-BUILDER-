@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NJPWELDER ULTRA WEB DEV 2026</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;transition:.3s;}
+:root{
+  --bg:#020617;
+  --panel:#0b1021;
+  --text:white;
+  --accent:#38bdf8;
+}
+.light{
+  --bg:#ffffff;
+  --panel:#e5e5e5;
+  --text:#000;
+  --accent:#2563eb;
+}
+body{background:var(--bg);color:var(--text);}
+
+/* LOADER */
+#loader{
+  position:fixed;
+  inset:0;
+  background:#000;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:9999;
+}
+.loader-ball{
+  width:15px;
+  height:15px;
+  margin:6px;
+  background:#38bdf8;
+  border-radius:50%;
+  animation:load .7s infinite alternate;
+}
+.loader-ball:nth-child(2){animation-delay:.2s;}
+.loader-ball:nth-child(3){animation-delay:.4s;}
+@keyframes load{
+  to{transform:translateY(-12px);opacity:.5;}
+}
+
+/* HEADER */
+header{
+  padding:25px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:linear-gradient(135deg,#4f46e5,#14b8a6,#9333ea);
+  box-shadow:0 0 25px #4f46e5;
+}
+.logo{
+  font-size:22px;
+  font-weight:bold;
+}
+.nav a{
+  margin:0 10px;
+  text-decoration:none;
+  color:white;
+}
+.toggle, .musicBtn{
+  padding:8px 14px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  margin-left:6px;
+}
+
+/* SECTION TITLE */
+section h2{text-align:center;margin:25px 0;}
+
+/* BUTTONS */
+.buttons{text-align:center;margin:15px 0;}
+.buttons a{
+  text-decoration:none;
+  background:rgba(255,255,255,0.08);
+  padding:10px 18px;
+  border-radius:8px;
+  margin:6px;
+  color:white;
+  border:1px solid rgba(255,255,255,0.3);
+}
+
+/* SLIDER */
+.container{width:95%;max-width:950px;margin:35px auto;}
+.slideshow{
+  border-radius:20px;overflow:hidden;border:2px solid var(--accent);
+  position:relative;box-shadow:0 0 25px var(--accent);
+}
+.slides{display:flex;transition:.6s;}
+.slides img{width:100%;height:350px;object-fit:cover;}
+.control{
+  position:absolute;top:50%;transform:translateY(-50%);
+  background:rgba(0,0,0,.6);padding:12px;border-radius:50%;cursor:pointer;
+}
+#prev{left:10px;}#next{right:10px;}
+.thumbs{display:flex;gap:6px;justify-content:center;margin-top:6px;}
+.thumbs img{
+  height:60px;width:90px;border-radius:8px;opacity:.6;
+  border:2px solid transparent;cursor:pointer;
+}
+.thumbs img.active{opacity:1;border-color:var(--accent);}
+
+/* GRID */
+.grid{
+  width:95%;margin:30px auto;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:12px;
+}
+.card{
+  height:120px;border-radius:12px;background:var(--panel);
+  border:1px solid #555;display:flex;align-items:center;
+  justify-content:center;
+}
+.card:hover{transform:translateY(-5px) scale(1.05);}
+
+/* CONTACT */
+.contact{
+  width:95%;max-width:800px;margin:40px auto;
+  padding:20px;border-radius:12px;background:var(--panel);
+}
+.contact input,.contact textarea{
+  width:100%;padding:10px;margin:8px 0;border:none;border-radius:8px;
+}
+.contact button{
+  width:100%;padding:10px;border-radius:8px;border:none;
+  background:var(--accent);font-weight:bold;cursor:pointer;
+}
+
+/* FOOTER */
+footer{
+  text-align:center;padding:25px;background:#000814;
+  border-top:1px solid #1f2937;
+  font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<div id="loader">
+  <div class="loader-ball"></div>
+  <div class="loader-ball"></div>
+  <div class="loader-ball"></div>
+</div>
+
+<header>
+  <div class="logo">🔥 NJPWELDER DEV</div>
+
+  <div class="nav">
+    <a href="#home">Home</a>
+    <a href="#gallery">Gallery</a>
+    <a href="#contact">Contact</a>
+  </div>
+
+  <div>
+    <button class="musicBtn" id="musicBtn">🎵 Music</button>
+    <button class="toggle" id="themeBtn">🌙 Mode</button>
+  </div>
+</header>
+
+<section id="home">
+  <h2>Welcome to Ultimate Responsive Website 🚀</h2>
+</section>
+
+<div class="container" id="gallery">
+  <div class="slideshow" id="slider">
+    <div class="slides">
+      <img src="https://images.unsplash.com/photo-1503264116251-35a269479413">
+      <img src="https://images.unsplash.com/photo-1517816743773-6e0fd518b4a6">
+      <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7">
+    </div>
+    <div class="control" id="prev">&#10094;</div>
+    <div class="control" id="next">&#10095;</div>
+  </div>
+  <div class="thumbs" id="thumbs"></div>
+</div>
+
+<section class="grid">
+  <script>
+    for(let i=1;i<=50;i++)
+      document.write('<div class="card">Styled Div '+i+'</div>');
+  </script>
+</section>
+
+<section class="contact" id="contact">
+  <h2>Contact Us</h2>
+  <input type="text" placeholder="Your Name">
+  <input type="email" placeholder="Your Email">
+  <textarea rows="4" placeholder="Message..."></textarea>
+  <button>Send Message</button>
+</section>
+
+<footer>
+  DEVELOPMENT BY : NJPWELDER WEB DEV 2026
+</footer>
+
+<audio id="music" loop>
+ <source src="https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Scott_Holmes_Music/Corporate__Motivational_Music/Scott_Holmes_Music_-_Inspiration.mp3">
+</audio>
+
+<script>
+// LOADER
+setTimeout(()=>document.getElementById("loader").style.display="none",1500);
+
+// DARK MODE
+const themeBtn=document.getElementById("themeBtn");
+themeBtn.onclick=()=>document.body.classList.toggle("light");
+
+// MUSIC
+const music=document.getElementById("music");
+const musicBtn=document.getElementById("musicBtn");
+let playing=false;
+musicBtn.onclick=()=>{
+ playing=!playing;
+ playing?music.play():music.pause();
+ musicBtn.textContent=playing?"⏸ Pause":"🎵 Music";
+};
+
+// SLIDER
+let index=0;
+const slides=document.querySelector(".slides");
+const images=document.querySelectorAll(".slides img");
+const thumbs=document.getElementById("thumbs");
+
+images.forEach((img,i)=>{
+ let t=document.createElement("img");
+ t.src=img.src;t.onclick=()=>show(i);thumbs.appendChild(t);
+});
+const thumbItems=document.querySelectorAll(".thumbs img");
+
+function show(i){
+ index=(i+images.length)%images.length;
+ slides.style.transform=`translateX(${-index*100}%)`;
+ thumbItems.forEach(t=>t.classList.remove("active"));
+ thumbItems[index].classList.add("active");
+}
+document.getElementById("next").onclick=()=>show(index+1);
+document.getElementById("prev").onclick=()=>show(index-1);
+
+let auto=setInterval(()=>show(index+1),4000);
+slider.onmouseover=()=>clearInterval(auto);
+slider.onmouseout =()=>auto=setInterval(()=>show(index+1),4000);
+
+// Swipe
+let startX=0;
+slider.addEventListener("touchstart",e=>startX=e.touches[0].clientX);
+slider.addEventListener("touchend",e=>{
+ let end=e.changedTouches[0].clientX;
+ if(startX-end>50)show(index+1);
+ if(end-startX>50)show(index-1);
+});
+show(0);
+</script>
+
+</body>
+</html>
