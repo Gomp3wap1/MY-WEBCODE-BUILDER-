@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Ninja Jump Arcade – Deluxe</title>
+<style>
+  body{margin:0;background:#000;overflow:hidden;}
+  canvas{display:block;margin:auto;border:3px solid #fff;background:#0b0b0b;}
+  #ui{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    display:flex;gap:15px;
+  }
+  .btn{
+    width:80px;height:80px;border-radius:50%;border:none;
+    background:#ffffff22;color:white;font-size:18px;font-weight:bold;
+    backdrop-filter:blur(3px);border:2px solid #fff;touch-action:manipulation;
+  }
+  #restartBtn{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    padding:14px 26px;font-size:20px;border-radius:10px;border:none;
+    display:none;cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game" width="950" height="450"></canvas>
+
+<div id="ui">
+  <button class="btn" id="jumpBtn">JUMP</button>
+  <button class="btn" id="slideBtn">SLIDE</button>
+</div>
+
+<button id="restartBtn">Restart</button>
+
+<script>
+
+// ================= CORE ==================
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const restartBtn=document.getElementById("restartBtn");
+const jumpBtn=document.getElementById("jumpBtn");
+const slideBtn=document.getElementById("slideBtn");
+
+// Sounds
+const jumpSound=new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+const hitSound=new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+const music=new Audio("https://cdn.pixabay.com/download/audio/2023/03/14/audio_0c3a30e94c.mp3?filename=arcade-music-loop-141081.mp3");
+music.loop=true;
+music.volume=0.4;
+
+let groundY=380;
+let gravity=0.7;
+
+let ninja={x:120,y:300,w:50,h:50,dy:0,jumps:0,sliding:false,frame:0};
+let obstacles=[];
+let speed=7;
+let score=0;
+let best=localStorage.ninjaBest?Number(localStorage.ninjaBest):0;
+let gameOver=false;
+let spawnTimer=0;
+
+// Parallax background
+let bg1=0,bg2=0;
+
+// Spawn different obstacles
+function spawnObstacle(){
+  const t=Math.random();
+  if(t<0.33) obstacles.push({x:950,y:groundY-35,w:35,h:35});
+  else if(t<0.66) obstacles.push({x:950,y:groundY-80,w:40,h:80});
+  else obstacles.push({x:950,y:groundY-18,w:70,h:18});
+}
+
+function reset(){
+  obstacles=[];
+  ninja={x:120,y:300,w:50,h:50,dy:0,jumps:0,sliding:false};
+  score=0;
+  speed=7;
+  gameOver=false;
+  spawnTimer=0;
+  restartBtn.style.display="none";
+  music.currentTime=0;
+  music.play();
+  update();
+}
+
+function update(){
+  if(gameOver) return;
+
+  ninja.dy+=gravity;
+  ninja.y+=ninja.dy;
+
+  if(ninja.y>groundY-ninja.h){
+    ninja.y=groundY-ninja.h;
+    ninja.dy=0;
+    ninja.jumps=0;
+  }
+
+  ninja.h=ninja.sliding?28:50;
+
+  spawnTimer++;
+  if(spawnTimer>60){
+    spawnObstacle();
+    spawnTimer=Math.max(18,60-score/12);
+  }
+
+  for(let o of obstacles) o.x-=speed;
+
+  obstacles=obstacles.filter(o=>{
+    if(ninja.x<ninja.w+o.x &&
+       ninja.x+ninja.w>o.x &&
+       ninja.y<ninja.h+o.y &&
+       ninja.y+ninja.h>o.y){
+        hitSound.play();
+        music.pause();
+        gameOver=true;
+        restartBtn.style.display="block";
+        if(score>best){
+          best=score;
+          localStorage.ninjaBest=best;
+        }
+    }
+    return o.x+o.w>0;
+  });
+
+  score++;
+  if(score%350===0) speed++;
+
+  ninja.frame+=0.2;
+  if(ninja.frame>3) ninja.frame=0;
+
+  bg1-=1;
+  bg2-=2;
+  if(bg1<-950) bg1=0;
+  if(bg2<-950) bg2=0;
+
+  draw();
+  requestAnimationFrame(update);
+}
+
+// ================= DRAW ==================
+function draw(){
+  ctx.clearRect(0,0,950,450);
+
+  // sky
+  ctx.fillStyle="#050505";
+  ctx.fillRect(0,0,950,450);
+
+  // parallax mountains
+  ctx.fillStyle="#181818";
+  ctx.fillRect(bg1,260,950,200);
+  ctx.fillRect(bg1+950,260,950,200);
+
+  ctx.fillStyle="#222";
+  ctx.fillRect(bg2,300,950,200);
+  ctx.fillRect(bg2+950,300,950,200);
+
+  // ground
+  ctx.fillStyle="#666";
+  ctx.fillRect(0,groundY,950,4);
+
+  // Animated ninja box effect
+  ctx.fillStyle="orange";
+  ctx.fillRect(ninja.x,ninja.y,ninja.w,ninja.h);
+  ctx.strokeStyle="#ffdd55";
+  ctx.lineWidth=3;
+  ctx.strokeRect(ninja.x-3+Math.sin(ninja.frame)*2,ninja.y-3,ninja.w+6,ninja.h+6);
+
+  // Obstacles
+  ctx.fillStyle="red";
+  obstacles.forEach(o=>ctx.fillRect(o.x,o.y,o.w,o.h));
+
+  // UI
+  ctx.fillStyle="white";
+  ctx.font="22px Arial";
+  ctx.fillText("Score: "+score,20,30);
+  ctx.fillText("Best: "+best,20,60);
+
+  if(gameOver){
+    ctx.font="46px Arial";
+    ctx.fillText("GAME OVER",355,200);
+  }
+}
+
+// ================= CONTROLS ==================
+function jump(){
+  if(ninja.jumps<2){
+    ninja.dy=-13;
+    ninja.jumps++;
+    jumpSound.play();
+  }
+}
+
+function slideOn(){ ninja.sliding=true; }
+function slideOff(){ ninja.sliding=false; }
+
+window.addEventListener("keydown",e=>{
+  if(e.code==="Space"||e.code==="ArrowUp") jump();
+  if(e.code==="ArrowDown") slideOn();
+});
+window.addEventListener("keyup",e=>{
+  if(e.code==="ArrowDown") slideOff();
+});
+
+// Touch buttons
+jumpBtn.ontouchstart=jump;
+slideBtn.ontouchstart=()=> ninja.sliding=true;
+slideBtn.ontouchend=()=> ninja.sliding=false;
+
+restartBtn.onclick=reset;
+
+music.play();
+update();
+</script>
+</body>
+</html>
