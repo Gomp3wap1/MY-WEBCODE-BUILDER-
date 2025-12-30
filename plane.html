@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultimate Flying Simulator</title>
+<style>
+body{margin:0;overflow:hidden;background:#000;font-family:Arial;}
+canvas{display:block;}
+#ui{position:fixed;top:10px;left:10px;z-index:10;color:white;text-shadow:1px 1px 2px #000;font-size:14px;}
+button{background:#0af;border:0;padding:8px 12px;color:white;border-radius:10px;margin-right:6px;}
+#mini{position:fixed;right:10px;bottom:10px;width:160px;height:120px;border:2px solid white;border-radius:10px;background:#001;}
+</style>
+</head>
+<body>
+
+<canvas id="world"></canvas>
+<canvas id="mini"></canvas>
+
+<div id="ui">
+  <button onclick="toggleGame()">Game Mode</button>
+  <button onclick="toggleWeather()">Weather</button>
+  <button onclick="toggleNight()">Day/Night</button>
+  <button onclick="toggleCamera()">Camera Follow</button>
+  <button onclick="saveWorld()">Save</button>
+  <button onclick="loadWorld()">Load</button>
+  <span id="info"></span>
+</div>
+
+<script>
+const canvas = document.getElementById("world");
+const ctx = canvas.getContext("2d");
+const mini = document.getElementById("mini");
+const mctx = mini.getContext("2d");
+let W=innerWidth,H=innerHeight;
+canvas.width=W;canvas.height=H;
+
+window.addEventListener("resize",()=>{W=innerWidth;H=innerHeight;canvas.width=W;canvas.height=H;});
+
+const map = new Image(); map.src="https://i.ibb.co/F7gh1Jm/map.jpg";
+const planeImg = new Image(); planeImg.src="https://i.ibb.co/Qr9ZwmW/plane.png";
+const heliImg = new Image(); heliImg.src="https://i.ibb.co/c1CD4m8/helicopter.png";
+
+let aircraft = [];
+let airports = [{x:W*0.2,y:H*0.7},{x:W*0.8,y:H*0.3}];
+let stars=[]; for(let i=0;i<150;i++) stars.push({x:Math.random()*W,y:Math.random()*H});
+let clouds = []; for(let i=0;i<8;i++) clouds.push({x:Math.random()*W,y:Math.random()*H/1.5,size:80+Math.random()*120,speed:0.2+Math.random()*0.4});
+
+let weather=true, night=false, game=false, camera=false;
+let score=0, lives=5;
+
+function newCraft(type){
+  return {x:Math.random()*W,y:Math.random()*H,speed:1+Math.random()*2,angle:Math.random()*360,fuel:100,size:30+Math.random()*30,mode:"wander",type:type,target:null,hover:type==="heli",trail:[]};
+}
+for(let i=0;i<20;i++) aircraft.push(newCraft(Math.random()>0.4?"plane":"heli"));
+
+let bgX=0;
+
+function move(a){
+  if(a.hover) a.speed=1+Math.sin(Date.now()/500)*0.3;
+  a.fuel-=0.02;
+  if(a.fuel<=0){if(game){lives--;aircraft.splice(aircraft.indexOf(a),1);return;}else a.fuel=100;}
+  
+  if(a.mode==="land"){
+    let dx=a.target.x-a.x, dy=a.target.y-a.y;
+    a.angle=Math.atan2(dy,dx)*180/Math.PI;
+    a.x+=dx*0.03; a.y+=dy*0.03;
+    if(Math.hypot(dx,dy)<10){a.fuel=100;score++;a.mode="wander";}
+  } else {
+    a.x+=Math.cos(a.angle*Math.PI/180)*a.speed;
+    a.y+=Math.sin(a.angle*Math.PI/180)*a.speed;
+    a.angle+=Math.random()*2-1;
+  }
+  
+  if(weather && Math.random()<0.01) a.angle+=Math.random()*40-20;
+  if(a.x<0)a.x=W;if(a.y<0)a.y=H;if(a.x>W)a.x=0;if(a.y>H)a.y=0;
+  if(a.fuel<25 && a.mode!=="land"){a.target=airports[Math.floor(Math.random()*airports.length)];a.mode="land";}
+  
+  a.trail.push({x:a.x,y:a.y});
+  if(a.trail.length>12) a.trail.shift();
+}
+
+function draw(a){
+  ctx.save();
+  ctx.translate(a.x,a.y);
+  ctx.rotate(a.angle*Math.PI/180);
+  ctx.globalAlpha=.4; ctx.fillStyle="black"; ctx.fillRect(-a.size/2,a.size/3,a.size,8); ctx.globalAlpha=1;
+  ctx.drawImage(a.type==="plane"?planeImg:heliImg,-a.size/2,-a.size/2,a.size,a.size);
+  ctx.restore();
+  
+  ctx.strokeStyle="cyan"; ctx.beginPath();
+  a.trail.forEach((t,i)=>{if(i===0) ctx.moveTo(t.x,t.y); else ctx.lineTo(t.x,t.y);}); ctx.stroke();
+}
+
+function drawAirports(){ctx.fillStyle="white";airports.forEach(a=>ctx.fillRect(a.x-50,a.y-4,100,8));}
+function drawClouds(){clouds.forEach(c=>{c.x+=c.speed;if(c.x>W+200)c.x=-200;ctx.fillStyle="white";ctx.globalAlpha=0.5;ctx.beginPath();ctx.arc(c.x,c.y,c.size,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;});}
+function drawNight(){if(night){ctx.fillStyle="rgba(0,0,40,.5)";ctx.fillRect(0,0,W,H);ctx.fillStyle="white";stars.forEach(s=>ctx.fillRect(s.x,s.y,2,2));}}
+function drawWeather(){if(weather){ctx.fillStyle="rgba(255,255,255,.04)";for(let i=0;i<60;i++)ctx.fillRect(Math.random()*W,Math.random()*H,4,4);}}
+
+function drawMini(){
+  mctx.clearRect(0,0,mini.width,mini.height);
+  mctx.fillStyle="rgba(0,255,255,.2)";mctx.fillRect(0,0,mini.width,mini.height);
+  mctx.fillStyle="lime";aircraft.forEach(a=>{mctx.fillRect((a.x/W)*mini.width,(a.y/H)*mini.height,4,4);});
+}
+
+function loop(){
+  ctx.clearRect(0,0,W,H);
+  bgX+=0.2; ctx.drawImage(map,-bgX,0,W+bgX,H); ctx.drawImage(map,W-bgX,0,W,H);
+  drawAirports();
+  if(weather) drawClouds();
+  drawWeather();
+  drawNight();
+  aircraft.forEach(a=>{move(a);draw(a);});
+  drawMini();
+  document.getElementById("info").innerHTML=`Planes:${aircraft.length} Score:${score} Lives:${lives}`;
+  requestAnimationFrame(loop);
+}
+canvas.addEventListener("click",e=>aircraft.push(newCraft(Math.random()>0.5?"plane":"heli")));
+canvas.addEventListener("touchstart",e=>{e.preventDefault();aircraft.push(newCraft("plane"));},{passive:false});
+
+function toggleWeather(){weather=!weather;}
+function toggleNight(){night=!night;}
+function toggleGame(){game=!game;}
+function toggleCamera(){camera=!camera;}
+function saveWorld(){localStorage.setItem('aircraft',JSON.stringify(aircraft));alert('World saved!');}
+function loadWorld(){let data=localStorage.getItem('aircraft');if(data){aircraft=JSON.parse(data);alert('World loaded!');}}
+
+loop();
+</script>
+</body>
+</html>
