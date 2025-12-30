@@ -1,0 +1,133 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bubble Bomb Arcade Pro</title>
+<style>
+html, body {margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#111;}
+canvas {display:block;}
+#ui {position:absolute; top:10px; left:10px; font-size:24px; color:white; z-index:10;}
+#leaderboard {position:absolute; top:50px; left:10px; font-size:18px; color:#ccc; z-index:10;}
+</style>
+</head>
+<body>
+<div id="ui">Score: 0 | Level: 1 | Time: 60 | Combo: x1</div>
+<div id="leaderboard">Leaderboard:<br></div>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+let W = window.innerWidth;
+let H = window.innerHeight;
+canvas.width = W;
+canvas.height = H;
+
+// Responsive resize
+window.addEventListener("resize", () => { W = window.innerWidth; H = window.innerHeight; canvas.width=W; canvas.height=H; });
+
+// Game variables
+let score=0, level=1, time=60, combo=1;
+let bubbles=[], particles=[];
+let leaderboard=[];
+let shake=0;
+
+// Animated star background
+let stars = [];
+for(let i=0;i<100;i++) stars.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*2+1, speed:Math.random()*0.5+0.2});
+function drawBackground(){
+  ctx.fillStyle="#0a0a0a"; ctx.fillRect(0,0,W,H);
+  stars.forEach(s=>{ s.y+=s.speed; if(s.y>H)s.y=0; ctx.fillStyle="white"; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); });
+}
+
+// Bubble class
+class Bubble {
+  constructor(type="normal"){
+    this.x=Math.random()*W; this.y=Math.random()*H;
+    this.r=20+Math.random()*20;
+    this.vx=(Math.random()-0.5)*(1+level);
+    this.vy=(Math.random()-0.5)*(1+level);
+    this.type=type;
+    this.color=this.getColor();
+    this.exploding=false;
+    this.explodeRadius=this.r;
+  }
+  getColor(){ switch(this.type){ case "bonus": return "gold"; case "slow": return "cyan"; case "bomb": return "black"; case "power": return "magenta"; default: return `hsl(${Math.random()*360},80%,60%)`; }}
+  move(){ this.x+=this.vx*0.95; this.y+=this.vy*0.95; if(this.x<this.r||this.x>W-this.r)this.vx*=-1; if(this.y<this.r||this.y>H-this.r)this.vy*=-1; }
+  draw(){
+    ctx.save(); ctx.shadowBlur=this.exploding?20:15; ctx.shadowColor=this.color;
+    ctx.beginPath(); ctx.arc(this.x,this.y,this.exploding?this.explodeRadius:this.r,0,Math.PI*2);
+    if(this.exploding){ ctx.strokeStyle="red"; ctx.lineWidth=4; ctx.stroke(); } else { ctx.fillStyle=this.color; ctx.fill(); }
+    ctx.restore();
+  }
+  explode(){
+    if(!this.exploding){
+      this.exploding=true;
+      let points=10;
+      if(this.type==="bonus") points=30*combo;
+      else if(this.type==="slow") { points=0; time+=5; }
+      else if(this.type==="bomb") { points=-50; level=Math.max(1,level-1); combo=1; }
+      else if(this.type==="power") { points=20; combo++; }
+      else points=10*combo;
+      score+=points; createParticles(this.x,this.y,this.color,this.type); playSound(this.type); shake=10;
+    }
+  }
+}
+
+// Particle class
+class Particle{
+  constructor(x,y,color,type="normal"){ this.x=x; this.y=y; this.vx=(Math.random()-0.5)*6; this.vy=(Math.random()-0.5)*6; this.r=2+Math.random()*3; this.color=color; this.life=30; this.type=type; }
+  move(){ this.x+=this.vx; this.y+=this.vy; this.life--; }
+  draw(){ ctx.save(); ctx.shadowBlur=10; ctx.shadowColor=this.color; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fillStyle=`rgba(${this.colorRGB()},${this.life/30})`; ctx.fill(); ctx.restore(); }
+  colorRGB(){ if(this.type==="normal") return "255,255,255"; if(this.type==="bonus") return "255,215,0"; if(this.type==="slow") return "0,255,255"; if(this.type==="bomb") return "0,0,0"; if(this.type==="power") return "255,0,255"; }
+}
+
+// Create particles
+function createParticles(x,y,color,type="normal"){ for(let i=0;i<30;i++) particles.push(new Particle(x,y,color,type)); }
+
+// Spawn bubbles
+function spawnBubbles(count){ for(let i=0;i<count;i++){ let type="normal"; let rnd=Math.random(); if(rnd<0.05) type="bonus"; else if(rnd<0.1) type="slow"; else if(rnd<0.13) type="bomb"; else if(rnd<0.16) type="power"; bubbles.push(new Bubble(type)); } }
+spawnBubbles(15);
+
+// Collision
+function collide(){ for(let i=0;i<bubbles.length;i++){ for(let j=i+1;j<bubbles.length;j++){ let a=bubbles[i],b=bubbles[j]; let dx=a.x-b.x,dy=a.y-b.y,dist=Math.sqrt(dx*dx+dy*dy); if(dist<a.r+b.r){ if(a.exploding||b.exploding){ a.explode(); b.explode(); } } } } }
+
+// Explode at click/touch
+function explodeAt(x,y){ bubbles.forEach(b=>{ let dx=b.x-x,dy=b.y-y; if(Math.sqrt(dx*dx+dy*dy)<b.r) b.explode(); }); }
+canvas.addEventListener("click",e=>explodeAt(e.clientX,e.clientY));
+canvas.addEventListener("touchstart",e=>{ e.preventDefault(); explodeAt(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+
+// Sound
+function playSound(type="normal"){ let url="https://www.soundjay.com/button/beep-07.mp3"; if(type==="bonus") url="https://www.soundjay.com/button/button-3.mp3"; if(type==="slow") url="https://www.soundjay.com/button/button-4.mp3"; if(type==="bomb") url="https://www.soundjay.com/button/button-10.mp3"; if(type==="power") url="https://www.soundjay.com/button/button-7.mp3"; const audio=new Audio(url); audio.play(); }
+
+// Timer & Level
+setInterval(()=>{
+  time--;
+  if(time<=0){ leaderboard.push(score); leaderboard.sort((a,b)=>b-a); document.getElementById("leaderboard").innerHTML="Leaderboard:<br>"+leaderboard.slice(0,5).join("<br>"); score=0; time=60; level=1; combo=1; bubbles=[]; spawnBubbles(15); } 
+  else if(score>level*100){ level++; spawnBubbles(5+level); }
+},1000);
+
+// Update UI
+function updateUI(){ document.getElementById("ui").textContent=`Score: ${score} | Level: ${level} | Time: ${time} | Combo: x${combo}`; }
+
+// Animation loop with screen shake
+function loop(){
+  const shakeX = (Math.random()-0.5)*shake;
+  const shakeY = (Math.random()-0.5)*shake;
+  if(shake>0) shake*=0.9;
+  ctx.save(); ctx.translate(shakeX,shakeY);
+  drawBackground();
+  bubbles.forEach(b=>{ if(!b.exploding)b.move(); b.draw(); });
+  particles.forEach(p=>{ p.move(); p.draw(); });
+  particles = particles.filter(p=>p.life>0);
+  collide();
+  bubbles = bubbles.filter(b=>b.explodeRadius<120);
+  ctx.restore();
+  updateUI();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
