@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ASCII Stick Fight with Platforms</title>
+<title>ASCII Stick Fight - Column Infantry</title>
 <style>
 body { background:#111; color:#0f0; font-family:monospace; display:flex; justify-content:center; align-items:center; flex-direction:column; height:100vh; margin:0; }
 pre { font-size:18px; line-height:16px; }
@@ -12,166 +13,140 @@ button { font-size:16px; margin:2px; padding:8px; background:#222; color:#0f0; b
 </head>
 <body>
 <pre id="screen"></pre>
-
 <div class="buttons">
-<button onclick="command('left')">Left</button>
-<button onclick="command('right')">Right</button>
-<button onclick="command('jump')">Jump</button>
-<button onclick="command('punch')">Punch</button>
-<button onclick="command('weapon sword')">Sword</button>
-<button onclick="command('weapon bow')">Bow</button>
+<button onclick="press('left')">Left</button>
+<button onclick="press('right')">Right</button>
+<button onclick="press('jump')">Jump</button>
+<button onclick="press('punch')">Punch</button>
+<button onclick="press('weapon sword')">Sword</button>
+<button onclick="press('weapon bow')">Bow</button>
 </div>
 
 <script>
-const width = 25;
-const height = 10;
-
-// Platforms: each {x1, x2, y}
+const width = 30;
+const height = 12;
 const platforms = [
-    {x1:0, x2:24, y:height-1},   // ground
-    {x1:5, x2:15, y:6},          // middle platform
-    {x1:18, x2:22, y:4}          // high platform
+  {x1:0, x2:29, y:height-1},
+  {x1:5, x2:20, y:8},
+  {x1:22, x2:28, y:5}
 ];
 
-let player = {x:2, y:height-1, hp:10, weapon:"fist", attacking:false};
-let enemies = [
-    {x:17, y:height-1, hp:5, attacking:false},
-    {x:15, y:height-1, hp:5, attacking:false}
-];
+let player = {x:2, y:height-1, vx:0, vy:0, hp:15, weapon:"fist", attacking:false};
+let enemies = [];
+let projectiles = [];
 
-function isPlatform(x,y){
-    return platforms.some(p=>y===p.y && x>=p.x1 && x<=p.x2);
+// Generate column infantry enemies
+for(let col=0; col<2; col++){
+    for(let row=0; row<3; row++){
+        enemies.push({x:25+col*2, y:height-1-row, vx:0, vy:0, hp:5, attacking:false});
+    }
 }
+
+const keys = {};
+function press(cmd){
+    if(cmd==="left") keys["ArrowLeft"]=true;
+    if(cmd==="right") keys["ArrowRight"]=true;
+    if(cmd==="jump") keys["ArrowUp"]=true;
+    if(cmd==="punch") keys["Space"]=true;
+    if(cmd.includes("weapon")) player.weapon=cmd.split(" ")[1];
+}
+document.addEventListener("keydown", e=>keys[e.key]=true);
+document.addEventListener("keyup", e=>keys[e.key]=false);
+
+function isPlatform(x,y){ return platforms.some(p=>y===p.y && x>=p.x1 && x<=p.x2); }
 
 function drawStick(x,y,attacking=false, weapon="fist"){
-    let parts = [];
-    parts.push({x:x, y:y-2, char:"O"}); // head
-    let bodyChar = "|";
-    if(attacking && weapon=="sword") bodyChar = "|—>";
-    if(attacking && weapon=="bow") bodyChar = "|->";
-    parts.push({x:x, y:y-1, char:bodyChar}); // body
-    let arms = attacking ? ["-","-"] : ["/","\\"]; 
-    parts.push({x:x-1, y:y-1, char:arms[0]});
-    parts.push({x:x+1, y:y-1, char:arms[1]});
-    parts.push({x:x-1, y:y, char:"/"}); // legs
-    parts.push({x:x+1, y:y, char:"\\"});
-    return parts;
+  const parts=[];
+  parts.push({x:x, y:y-2, char:"O"});
+  let bodyChar="|";
+  if(attacking && weapon=="sword") bodyChar="|->";
+  if(attacking && weapon=="bow") bodyChar="|>>";
+  parts.push({x:x, y:y-1, char:bodyChar});
+  let arms = attacking?["-","-"]:["/","\\"];
+  parts.push({x:x-1, y:y-1, char:arms[0]});
+  parts.push({x:x+1, y:y-1, char:arms[1]});
+  parts.push({x:x-1, y:y, char:"/"});
+  parts.push({x:x+1, y:y, char:"\\"});
+  return parts;
 }
 
-// Render function
+// Game update
+function update(){
+  // Player movement
+  player.vx=0;
+  if(keys["ArrowLeft"]) player.vx=-1;
+  if(keys["ArrowRight"]) player.vx=1;
+  if(keys["ArrowUp"] && isPlatform(player.x,player.y+1)) player.vy=-2;
+  player.x += player.vx;
+  player.y += player.vy;
+
+  // Gravity
+  if(!isPlatform(player.x,player.y+1)) player.vy +=0.2;
+  else player.vy=0;
+  if(player.y>height-1) player.y=height-1;
+
+  // Player attack
+  if(keys["Space"]){
+    if(player.weapon=="bow") projectiles.push({x:player.x+1, y:player.y-1, dx:1, owner:"player"});
+    else player.attacking=true;
+  }
+
+  // Enemy AI: column infantry
+  enemies.forEach(e=>{
+    if(e.hp<=0) return;
+    if(e.x>player.x && !isPlatform(e.x-1,e.y)) e.vx=-0.5;
+    else if(e.x<player.x && !isPlatform(e.x+1,e.y)) e.vx=0.5;
+    e.x += e.vx;
+    if(!isPlatform(e.x,e.y+1)) e.y +=0.2;
+    if(Math.abs(e.x-player.x)<=1 && Math.random()<0.02) e.attacking=true;
+    // Enemy bow randomly
+    if(Math.random()<0.005) projectiles.push({x:e.x-1, y:e.y-1, dx:-1, owner:"enemy"});
+  });
+
+  // Attack logic
+  if(player.attacking){
+    enemies.forEach(e=>{ if(Math.abs(player.x-e.x)<=1) e.hp -= (player.weapon=="sword"?2:1); });
+    player.attacking=false;
+  }
+  enemies.forEach(e=>{ if(e.attacking && Math.abs(player.x-e.x)<=1) player.hp--; e.attacking=false; });
+
+  // Projectiles
+  projectiles.forEach(p=>{
+    p.x += p.dx;
+    if(p.owner=="player") enemies.forEach(e=>{ if(Math.abs(e.x-p.x)<=0.5 && Math.abs(e.y-p.y)<=1){ e.hp--; p.hit=true; } });
+    if(p.owner=="enemy"){ if(Math.abs(player.x-p.x)<=0.5 && Math.abs(player.y-p.y)<=1){ player.hp--; p.hit=true; } }
+  });
+  projectiles = projectiles.filter(p=>!p.hit && p.x>=0 && p.x<width);
+
+  render();
+  checkWin();
+}
+
+// Render
 function render(){
-    let grid = [];
-    for(let y=0;y<height;y++){
-        grid[y] = [];
-        for(let x=0;x<width;x++) grid[y][x]=" ";
-    }
+  const grid = Array.from({length:height},()=>Array(width).fill(" "));
+  platforms.forEach(p=>{ for(let x=p.x1;x<=p.x2;x++) grid[p.y][x]="#"; });
 
-    // Draw platforms
-    platforms.forEach(p=>{
-        for(let x=p.x1;x<=p.x2;x++) grid[p.y][x] = "#";
-    });
+  drawStick(Math.round(player.x),Math.round(player.y),player.attacking,player.weapon)
+    .forEach(p=>{ if(p.x>=0&&p.x<width&&p.y>=0&&p.y<height) grid[Math.round(p.y)][Math.round(p.x)]=p.char; });
+  enemies.forEach(e=>{ if(e.hp<=0) return; drawStick(Math.round(e.x),Math.round(e.y),false,"fist")
+    .forEach(p=>{ if(p.x>=0&&p.x<width&&p.y>=0&&p.y<height) grid[Math.round(p.y)][Math.round(p.x)]=p.char; }); });
+  projectiles.forEach(p=>{ if(p.x>=0&&p.x<width&&p.y>=0&&p.y<height) grid[Math.round(p.y)][Math.round(p.x)]=">"; });
 
-    // Draw player
-    let pLines = drawStick(player.x, player.y, player.attacking, player.weapon);
-    pLines.forEach(l=>{
-        if(l.x>=0 && l.x<width && l.y>=0 && l.y<height) grid[l.y][l.x]=l.char;
-    });
-
-    // Draw enemies
-    enemies.forEach(e=>{
-        let eLines = drawStick(e.x, e.y, e.attacking, "fist");
-        eLines.forEach(l=>{
-            if(l.x>=0 && l.x<width && l.y>=0 && l.y<height) grid[l.y][l.x]=l.char;
-        });
-    });
-
-    let out="";
-    for(let y=0;y<height;y++){
-        for(let x=0;x<width;x++) out+=grid[y][x];
-        out+="\n";
-    }
-    out+="Player HP: "+player.hp+" ("+player.weapon+")\n";
-    enemies.forEach((e,i)=>out+="Enemy"+(i+1)+" HP: "+e.hp+"\n");
-    document.getElementById("screen").textContent = out;
+  let output="";
+  grid.forEach(row=>output+=row.join("")+"\n");
+  output += `Player HP:${player.hp}(${player.weapon})\n`;
+  enemies.forEach((e,i)=>output+=`Enemy${i+1} HP:${e.hp}\n`);
+  document.getElementById("screen").textContent = output;
 }
 
-// Gravity and movement
-function applyGravity(){
-    // Player
-    if(!isPlatform(player.x, player.y+1) && player.y<height-1){
-        player.y+=1;
-    }
-    // Enemies
-    enemies.forEach(e=>{
-        if(!isPlatform(e.x, e.y+1) && e.y<height-1){
-            e.y+=1;
-        }
-    });
-}
-
-// Handle commands
-function command(cmd){
-    cmd = cmd.toLowerCase();
-    if(cmd.includes("left") && player.x>0 && !isPlatform(player.x-1, player.y)) player.x--;
-    if(cmd.includes("right") && player.x<width-1 && !isPlatform(player.x+1, player.y)) player.x++;
-    if(cmd.includes("jump")){
-        // Check if standing on platform
-        if(isPlatform(player.x, player.y+1)) player.y = Math.max(0, player.y-2);
-    }
-    if(cmd.includes("weapon")){
-        if(cmd.includes("sword")) player.weapon="sword";
-        if(cmd.includes("bow")) player.weapon="bow";
-    }
-    if(cmd.includes("punch")) player.attacking=true;
-
-    enemyAI();
-    applyGravity();
-    attackLogic();
-    render();
-    checkWin();
-}
-
-// Enemy AI: move toward player
-function enemyAI(){
-    enemies.forEach(e=>{
-        if(e.hp<=0) return;
-        if(e.x>player.x && !isPlatform(e.x-1,e.y)) e.x--;
-        else if(e.x<player.x && !isPlatform(e.x+1,e.y)) e.x++;
-        if(Math.abs(e.x-player.x)<=1 && Math.random()<0.5) e.attacking=true;
-    });
-}
-
-// Attack logic
-function attackLogic(){
-    // Player attack
-    if(player.attacking){
-        enemies.forEach(e=>{
-            let range = player.weapon=="bow"?5:1;
-            if(Math.abs(player.x-e.x)<=range) e.hp -= (player.weapon=="sword"?2:1);
-        });
-        player.attacking=false;
-    }
-    // Enemy attack
-    enemies.forEach(e=>{
-        if(e.attacking && Math.abs(player.x-e.x)<=1) player.hp--;
-        e.attacking=false;
-    });
-}
-
-// Win/Lose
+// Win/lose
 function checkWin(){
-    if(player.hp<=0){
-        alert("You lost!");
-        location.reload();
-    }
-    if(enemies.every(e=>e.hp<=0)){
-        alert("You win!");
-        location.reload();
-    }
+  if(player.hp<=0){ alert("You lost!"); location.reload(); }
+  if(enemies.every(e=>e.hp<=0)){ alert("You win!"); location.reload(); }
 }
 
-// Initial render
-render();
+setInterval(update,100); // arcade loop 10fps
 </script>
 </body>
 </html>
