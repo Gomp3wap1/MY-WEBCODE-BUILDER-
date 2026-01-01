@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Mobile HTML5 App w/ Live</title>
+
+<style>
+body{margin:0;background:#0f0f0f;color:white;font-family:Arial}
+header{position:sticky;top:0;z-index:10;background:#181818;padding:10px;display:flex;gap:8px}
+input{flex:1;padding:10px;border-radius:30px;border:none;outline:none}
+button{background:#272727;color:white;border:none;border-radius:50px;padding:8px 10px;cursor:pointer}
+.tabs{display:flex;overflow-x:auto;gap:8px;background:#101010;padding:8px}
+.tab{padding:8px 12px;border-radius:20px;background:#252525;white-space:nowrap;cursor:pointer}
+.tab.active{background:red}
+.filters{display:flex;gap:8px;overflow-x:auto;padding:8px;background:#141414}
+select{background:#272727;color:white;padding:8px;border-radius:8px;border:none}
+.results{padding:10px;display:grid;gap:12px}
+.video-card{background:#181818;border-radius:10px;overflow:hidden;transition:0.3s}
+.video-card:hover{transform:scale(1.01)}
+.thumbnail{width:100%;aspect-ratio:16/9;background-size:cover;background-position:center;cursor:pointer}
+.info{padding:10px}
+.title{font-size:16px;font-weight:bold}
+.meta{font-size:13px;color:#aaa}
+.desc{font-size:12px;color:#bbb;margin-top:6px}
+#miniPlayer{position:fixed;bottom:10px;right:10px;width:260px;height:150px;background:black;display:none;border-radius:8px;overflow:hidden;z-index:99}
+#miniPlayer iframe{width:100%;height:100%}
+.closeMini{position:absolute;top:5px;right:5px;background:red;border-radius:50%;padding:5px;cursor:pointer}
+.skeleton{background:#1f1f1f;height:200px;border-radius:10px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+.theme-light{background:white;color:black}
+.theme-light .video-card{background:white;color:black}
+</style>
+</head>
+
+<body>
+
+<header>
+<input id="searchBox" placeholder="Search YouTube">
+<button onclick="voiceSearch()">🎤</button>
+<button onclick="toggleTheme()">🌗</button>
+<button onclick="showFavorites()">⭐</button>
+<button onclick="showHistory()">🕒</button>
+</header>
+
+<div class="tabs">
+<div class="tab active" onclick="loadTrending()">Trending</div>
+<div class="tab" onclick="category('Music')">Music</div>
+<div class="tab" onclick="category('Gaming')">Gaming</div>
+<div class="tab" onclick="category('News')">News</div>
+<div class="tab" onclick="category('Sports')">Sports</div>
+<div class="tab" onclick="category('Movies')">Movies</div>
+<div class="tab" onclick="loadLive()">Live</div>
+</div>
+
+<div class="filters">
+<select id="sort">
+<option value="relevance">Relevance</option>
+<option value="date">Newest</option>
+<option value="viewCount">Most Viewed</option>
+</select>
+
+<select id="upload">
+<option value="">Any time</option>
+<option value="today">Today</option>
+<option value="week">This week</option>
+<option value="month">This month</option>
+</select>
+
+<select id="duration">
+<option value="">Any Length</option>
+<option value="short">Short (&lt; 4 min)</option>
+<option value="medium">4–20 min</option>
+<option value="long">20+ min</option>
+</select>
+
+<button onclick="clearFavorites()">❌⭐</button>
+<button onclick="clearHistory()">❌🕒</button>
+</div>
+
+<div class="results" id="resultContainer"></div>
+
+<div id="miniPlayer">
+<button class="closeMini" onclick="closeMini()">✖</button>
+<iframe id="miniVideo" allowfullscreen></iframe>
+</div>
+
+<script>
+let API_KEY="AIzaSyBIEVrf0wNiV9_bT2A9swIUpgHUF4Q9MeU";
+let nextPageToken="";
+let currentQuery="";
+const box=document.getElementById("searchBox");
+const container=document.getElementById("resultContainer");
+
+let favorites=JSON.parse(localStorage.getItem("favorites")||"[]");
+let historyList=JSON.parse(localStorage.getItem("history")||"[]");
+
+// LOADING SKELETON
+function loading(){
+container.innerHTML="";
+for(let i=0;i<6;i++) container.innerHTML+=`<div class="skeleton"></div>`;
+}
+
+// TRENDING
+async function loadTrending(){
+setActiveTab("Trending");
+loading();
+currentQuery="trending";
+nextPageToken="";
+const res=await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=trending&key=${API_KEY}`);
+const data=await res.json();
+container.innerHTML="";
+data.items.forEach(v=>render({
+id:v.id.videoId||v.id,
+title:v.snippet.title,
+thumb:v.snippet.thumbnails.high.url,
+channel:v.snippet.channelTitle,
+desc:v.snippet.description
+}));
+}
+
+// CATEGORY
+function category(name){
+setActiveTab(name);
+box.value=name;
+search();
+}
+
+// SEARCH
+async function search(reset=true){
+setActiveTab("Search");
+if(reset){container.innerHTML="";nextPageToken="";}
+currentQuery=box.value;
+loading();
+
+let url=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(currentQuery)}&key=${API_KEY}`;
+url+=`&order=${document.getElementById("sort").value}`;
+
+let upload=document.getElementById("upload").value;
+if(upload==="today")url+="&publishedAfter="+new Date(Date.now()-86400000).toISOString();
+if(upload==="week")url+="&publishedAfter="+new Date(Date.now()-604800000).toISOString();
+if(upload==="month")url+="&publishedAfter="+new Date(Date.now()-2592000000).toISOString();
+
+let duration=document.getElementById("duration").value;
+if(duration)url+=`&videoDuration=${duration}`;
+if(nextPageToken)url+=`&pageToken=${nextPageToken}`;
+
+const res=await fetch(url);
+const data=await res.json();
+nextPageToken=data.nextPageToken||"";
+container.innerHTML="";
+
+data.items.forEach(v=>render({
+id:v.id.videoId,
+title:v.snippet.title,
+thumb:v.snippet.thumbnails.high.url,
+channel:v.snippet.channelTitle,
+desc:v.snippet.description
+}));
+}
+
+box.addEventListener("keydown",e=>{if(e.key==="Enter")search();});
+
+// LIVE STREAM TAB
+async function loadLive(){
+setActiveTab("Live");
+loading();
+const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&eventType=live&type=video&maxResults=10&q=&key=${API_KEY}`;
+const res=await fetch(url);
+const data=await res.json();
+container.innerHTML="";
+data.items.forEach(v=>render({
+id:v.id.videoId,
+title:v.snippet.title,
+thumb:v.snippet.thumbnails.high.url,
+channel:v.snippet.channelTitle,
+desc:v.snippet.description
+}));
+}
+
+// RENDER VIDEO
+function render(v){
+container.innerHTML+=`
+<div class="video-card">
+ <div class="thumbnail" style="background-image:url('${v.thumb}')" onclick="playMini('${v.id}','${v.title}','${v.channel}','${v.thumb}')"></div>
+ <div class="info">
+ <div class="title">${v.title}</div>
+ <div class="meta">${v.channel}</div>
+ <div class="desc">${v.desc?.slice(0,80)||""}...</div>
+ <button onclick='saveFavorite(${JSON.stringify(v)})'>⭐</button>
+ <button onclick="share('${"https://youtube.com/watch?v="+v.id}')">🔗</button>
+ </div>
+</div>`;
+}
+
+// MINI PLAYER
+function playMini(id,title,channel,thumb){
+document.getElementById("miniPlayer").style.display="block";
+document.getElementById("miniVideo").src=`https://www.youtube.com/embed/${id}`;
+historyList.unshift({id,title,channel,thumb});
+localStorage.setItem("history",JSON.stringify(historyList));
+}
+
+function closeMini(){
+document.getElementById("miniPlayer").style.display="none";
+document.getElementById("miniVideo").src="";
+}
+
+// FAVORITES
+function saveFavorite(v){
+favorites.push(v);
+localStorage.setItem("favorites",JSON.stringify(favorites));
+alert("Added to favorites");
+}
+
+function showFavorites(){
+container.innerHTML="";
+favorites.forEach(render);
+}
+
+function clearFavorites(){
+favorites=[];
+localStorage.setItem("favorites","[]");
+alert("Favorites cleared");
+}
+
+// HISTORY
+function showHistory(){
+container.innerHTML="";
+historyList.forEach(render);
+}
+
+function clearHistory(){
+historyList=[];
+localStorage.setItem("history","[]");
+alert("History cleared");
+}
+
+// SHARE
+function share(link){
+navigator.clipboard.writeText(link);
+alert("Link copied!");
+}
+
+// THEME
+function toggleTheme(){
+document.body.classList.toggle("theme-light");
+}
+
+// VOICE
+function voiceSearch(){
+if(!('webkitSpeechRecognition' in window)){alert("Not supported");return;}
+let r=new webkitSpeechRecognition();
+r.lang="en-US";
+r.start();
+r.onresult=e=>{
+box.value=e.results[0][0].transcript;
+search();
+}
+}
+
+// INFINITE SCROLL
+window.addEventListener("scroll",()=>{
+if(window.innerHeight+window.scrollY>=document.body.offsetHeight-200){
+if(nextPageToken)search(false);
+}
+});
+
+// TAB ACTIVATION
+function setActiveTab(name){
+document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+document.querySelectorAll(".tab").forEach(t=>{if(t.innerText===name)t.classList.add("active");});
+}
+
+// AUTO LOAD TRENDING
+loadTrending();
+</script>
+
+</body>
+</html>
