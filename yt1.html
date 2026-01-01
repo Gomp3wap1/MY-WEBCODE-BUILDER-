@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YouTube Mobile HTML5 App w/ Live</title>
+<title>YouTube Center Player HTML5 App</title>
 
 <style>
-body{margin:0;background:#0f0f0f;color:white;font-family:Arial}
+body{margin:0;background:#0f0f0f;color:white;font-family:Arial;overflow-x:hidden}
 header{position:sticky;top:0;z-index:10;background:#181818;padding:10px;display:flex;gap:8px}
 input{flex:1;padding:10px;border-radius:30px;border:none;outline:none}
 button{background:#272727;color:white;border:none;border-radius:50px;padding:8px 10px;cursor:pointer}
@@ -23,13 +23,27 @@ select{background:#272727;color:white;padding:8px;border-radius:8px;border:none}
 .title{font-size:16px;font-weight:bold}
 .meta{font-size:13px;color:#aaa}
 .desc{font-size:12px;color:#bbb;margin-top:6px}
-#miniPlayer{position:fixed;bottom:10px;right:10px;width:260px;height:150px;background:black;display:none;border-radius:8px;overflow:hidden;z-index:99}
-#miniPlayer iframe{width:100%;height:100%}
-.closeMini{position:absolute;top:5px;right:5px;background:red;border-radius:50%;padding:5px;cursor:pointer}
-.skeleton{background:#1f1f1f;height:200px;border-radius:10px;animation:pulse 1.5s infinite}
-@keyframes pulse{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
 .theme-light{background:white;color:black}
 .theme-light .video-card{background:white;color:black}
+
+/* CENTERED MODAL PLAYER */
+#centerPlayer{
+display:none;
+position:fixed;
+top:0;left:0;width:100%;height:100%;
+background:rgba(0,0,0,0.9);
+justify-content:center;align-items:center;
+z-index:999;
+}
+#centerPlayer iframe{
+width:90%;max-width:900px;
+height:50%;max-height:500px;
+border:none;
+border-radius:10px;
+}
+#closeCenter{
+position:absolute;top:20px;right:20px;background:red;color:white;padding:8px 12px;border:none;border-radius:8px;cursor:pointer;font-size:18px;
+}
 </style>
 </head>
 
@@ -80,9 +94,10 @@ select{background:#272727;color:white;padding:8px;border-radius:8px;border:none}
 
 <div class="results" id="resultContainer"></div>
 
-<div id="miniPlayer">
-<button class="closeMini" onclick="closeMini()">✖</button>
-<iframe id="miniVideo" allowfullscreen></iframe>
+<!-- CENTER PLAYER MODAL -->
+<div id="centerPlayer" onclick="closeCenter(event)">
+<button id="closeCenter">✖</button>
+<iframe id="centerVideo" allowfullscreen></iframe>
 </div>
 
 <script>
@@ -96,10 +111,7 @@ let favorites=JSON.parse(localStorage.getItem("favorites")||"[]");
 let historyList=JSON.parse(localStorage.getItem("history")||"[]");
 
 // LOADING SKELETON
-function loading(){
-container.innerHTML="";
-for(let i=0;i<6;i++) container.innerHTML+=`<div class="skeleton"></div>`;
-}
+function loading(){container.innerHTML="";for(let i=0;i<6;i++)container.innerHTML+=`<div class="skeleton"></div>`}
 
 // TRENDING
 async function loadTrending(){
@@ -120,11 +132,7 @@ desc:v.snippet.description
 }
 
 // CATEGORY
-function category(name){
-setActiveTab(name);
-box.value=name;
-search();
-}
+function category(name){setActiveTab(name);box.value=name;search();}
 
 // SEARCH
 async function search(reset=true){
@@ -132,36 +140,24 @@ setActiveTab("Search");
 if(reset){container.innerHTML="";nextPageToken="";}
 currentQuery=box.value;
 loading();
-
 let url=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(currentQuery)}&key=${API_KEY}`;
 url+=`&order=${document.getElementById("sort").value}`;
-
 let upload=document.getElementById("upload").value;
 if(upload==="today")url+="&publishedAfter="+new Date(Date.now()-86400000).toISOString();
 if(upload==="week")url+="&publishedAfter="+new Date(Date.now()-604800000).toISOString();
 if(upload==="month")url+="&publishedAfter="+new Date(Date.now()-2592000000).toISOString();
-
-let duration=document.getElementById("duration").value;
-if(duration)url+=`&videoDuration=${duration}`;
+let duration=document.getElementById("duration").value;if(duration)url+=`&videoDuration=${duration}`;
 if(nextPageToken)url+=`&pageToken=${nextPageToken}`;
-
-const res=await fetch(url);
-const data=await res.json();
-nextPageToken=data.nextPageToken||"";
-container.innerHTML="";
-
+const res=await fetch(url);const data=await res.json();
+nextPageToken=data.nextPageToken||"";container.innerHTML="";
 data.items.forEach(v=>render({
-id:v.id.videoId,
-title:v.snippet.title,
-thumb:v.snippet.thumbnails.high.url,
-channel:v.snippet.channelTitle,
-desc:v.snippet.description
+id:v.id.videoId,title:v.snippet.title,thumb:v.snippet.thumbnails.high.url,channel:v.snippet.channelTitle,desc:v.snippet.description
 }));
 }
 
 box.addEventListener("keydown",e=>{if(e.key==="Enter")search();});
 
-// LIVE STREAM TAB
+// LIVE TAB
 async function loadLive(){
 setActiveTab("Live");
 loading();
@@ -170,109 +166,67 @@ const res=await fetch(url);
 const data=await res.json();
 container.innerHTML="";
 data.items.forEach(v=>render({
-id:v.id.videoId,
-title:v.snippet.title,
-thumb:v.snippet.thumbnails.high.url,
-channel:v.snippet.channelTitle,
-desc:v.snippet.description
+id:v.id.videoId,title:v.snippet.title,thumb:v.snippet.thumbnails.high.url,channel:v.snippet.channelTitle,desc:v.snippet.description
 }));
 }
 
-// RENDER VIDEO
+// RENDER
 function render(v){
 container.innerHTML+=`
 <div class="video-card">
- <div class="thumbnail" style="background-image:url('${v.thumb}')" onclick="playMini('${v.id}','${v.title}','${v.channel}','${v.thumb}')"></div>
- <div class="info">
- <div class="title">${v.title}</div>
- <div class="meta">${v.channel}</div>
- <div class="desc">${v.desc?.slice(0,80)||""}...</div>
- <button onclick='saveFavorite(${JSON.stringify(v)})'>⭐</button>
- <button onclick="share('${"https://youtube.com/watch?v="+v.id}')">🔗</button>
- </div>
+<div class="thumbnail" style="background-image:url('${v.thumb}')" onclick="playCenter('${v.id}','${v.title}','${v.channel}','${v.thumb}')"></div>
+<div class="info">
+<div class="title">${v.title}</div>
+<div class="meta">${v.channel}</div>
+<div class="desc">${v.desc?.slice(0,80)||""}...</div>
+<button onclick='saveFavorite(${JSON.stringify(v)})'>⭐</button>
+<button onclick="share('${"https://youtube.com/watch?v="+v.id}')">🔗</button>
+</div>
 </div>`;
 }
 
-// MINI PLAYER
-function playMini(id,title,channel,thumb){
-document.getElementById("miniPlayer").style.display="block";
-document.getElementById("miniVideo").src=`https://www.youtube.com/embed/${id}`;
+// CENTER PLAYER
+function playCenter(id,title,channel,thumb){
+document.getElementById("centerPlayer").style.display="flex";
+document.getElementById("centerVideo").src=`https://www.youtube.com/embed/${id}?autoplay=1`;
 historyList.unshift({id,title,channel,thumb});
 localStorage.setItem("history",JSON.stringify(historyList));
 }
 
-function closeMini(){
-document.getElementById("miniPlayer").style.display="none";
-document.getElementById("miniVideo").src="";
+// CLOSE CENTER
+function closeCenter(e){
+if(e.target.id==="centerPlayer" || e.target.id==="closeCenter"){
+document.getElementById("centerPlayer").style.display="none";
+document.getElementById("centerVideo").src="";
+}
 }
 
 // FAVORITES
-function saveFavorite(v){
-favorites.push(v);
-localStorage.setItem("favorites",JSON.stringify(favorites));
-alert("Added to favorites");
-}
-
-function showFavorites(){
-container.innerHTML="";
-favorites.forEach(render);
-}
-
-function clearFavorites(){
-favorites=[];
-localStorage.setItem("favorites","[]");
-alert("Favorites cleared");
-}
+function saveFavorite(v){favorites.push(v);localStorage.setItem("favorites",JSON.stringify(favorites));alert("Added to favorites")}
+function showFavorites(){container.innerHTML="";favorites.forEach(render);}
+function clearFavorites(){favorites=[];localStorage.setItem("favorites","[]");alert("Favorites cleared")}
 
 // HISTORY
-function showHistory(){
-container.innerHTML="";
-historyList.forEach(render);
-}
-
-function clearHistory(){
-historyList=[];
-localStorage.setItem("history","[]");
-alert("History cleared");
-}
+function showHistory(){container.innerHTML="";historyList.forEach(render);}
+function clearHistory(){historyList=[];localStorage.setItem("history","[]");alert("History cleared")}
 
 // SHARE
-function share(link){
-navigator.clipboard.writeText(link);
-alert("Link copied!");
-}
+function share(link){navigator.clipboard.writeText(link);alert("Link copied!");}
 
 // THEME
-function toggleTheme(){
-document.body.classList.toggle("theme-light");
-}
+function toggleTheme(){document.body.classList.toggle("theme-light");}
 
 // VOICE
-function voiceSearch(){
-if(!('webkitSpeechRecognition' in window)){alert("Not supported");return;}
-let r=new webkitSpeechRecognition();
-r.lang="en-US";
-r.start();
-r.onresult=e=>{
-box.value=e.results[0][0].transcript;
-search();
-}
-}
+function voiceSearch(){if(!('webkitSpeechRecognition' in window)){alert("Not supported");return;}
+let r=new webkitSpeechRecognition();r.lang="en-US";r.start();r.onresult=e=>{box.value=e.results[0][0].transcript;search();}}
 
 // INFINITE SCROLL
-window.addEventListener("scroll",()=>{
-if(window.innerHeight+window.scrollY>=document.body.offsetHeight-200){
-if(nextPageToken)search(false);
-}
-});
+window.addEventListener("scroll",()=>{if(window.innerHeight+window.scrollY>=document.body.offsetHeight-200){if(nextPageToken)search(false);}});
 
-// TAB ACTIVATION
-function setActiveTab(name){
-document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-document.querySelectorAll(".tab").forEach(t=>{if(t.innerText===name)t.classList.add("active");});
-}
+// TAB ACTIVE
+function setActiveTab(name){document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));document.querySelectorAll(".tab").forEach(t=>{if(t.innerText===name)t.classList.add("active");});}
 
-// AUTO LOAD TRENDING
+// LOAD TRENDING
 loadTrending();
 </script>
 
