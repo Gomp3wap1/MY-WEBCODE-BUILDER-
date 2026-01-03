@@ -2,7 +2,7 @@
 
 // Add up to 10 API keys
 const API_KEYS = [
-  "API_KEY_1","API_KEY_2","API_KEY_3","API_KEY_4","API_KEY_5",
+  "AIzaSyDGmjm1-ZgBKjHbh9r9slExiHZNWCxpbZ4","API_KEY_2","API_KEY_3","API_KEY_4","API_KEY_5",
   "API_KEY_6","API_KEY_7","API_KEY_8","API_KEY_9","API_KEY_10"
 ];
 
