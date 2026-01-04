@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>HTML5 Snake Deluxe</title>
+<style>
+body{
+  background:#0c0c0c;
+  color:white;
+  font-family:Arial;
+  text-align:center;
+}
+canvas{
+  background:#000;
+  border:4px solid #0f0;
+  margin-top:12px;
+}
+button,select,input{
+  padding:6px 10px;
+  margin:3px;
+}
+#achievements{
+  max-width:420px;
+  margin:10px auto;
+  font-size:14px;
+}
+.unlocked{color:#0f0;}
+.locked{color:#777;}
+</style>
+</head>
+<body>
+
+<h1>🐍 HTML5 Snake — Deluxe</h1>
+
+<div id="ui">
+Score: <span id="score">0</span> |
+Best: <span id="best">0</span>
+<br>
+
+Difficulty:
+<select id="difficulty">
+  <option value="140">Easy</option>
+  <option value="100" selected>Normal</option>
+  <option value="70">Hard</option>
+</select>
+
+Theme:
+<select id="theme">
+  <option value="classic">Classic</option>
+  <option value="neon">Neon</option>
+  <option value="retro">Retro</option>
+  <option value="ice">Ice</option>
+</select>
+
+Skin:
+<select id="skin">
+  <option value="default">Default</option>
+  <option value="gold">Gold (20+ score)</option>
+  <option value="rainbow">Rainbow (40+ score)</option>
+</select>
+
+Arena:
+<select id="arena">
+  <option value="open">Open Field</option>
+  <option value="cross">Cross</option>
+  <option value="box">Box Inside</option>
+</select>
+
+<br>
+Wrap <input type="checkbox" id="wrap">
+Maze <input type="checkbox" id="maze">
+
+<button onclick="resetGame()">Restart</button>
+<button onclick="togglePause()">Pause/Resume</button>
+</div>
+
+<canvas id="game" width="400" height="400"></canvas>
+
+<div id="achievements">
+<b>Achievements</b><br>
+<span id="a10" class="locked">Score 10+</span> |
+<span id="a25" class="locked">Score 25+</span> |
+<span id="a50" class="locked">Score 50+</span>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const box=20;
+
+let snake,dir,food,particles=[],score=0,best=0,loop,paused=false;
+
+best=localStorage.snakeBest || 0;
+document.getElementById("best").innerText=best;
+
+// ==== SETTINGS LOAD ====
+function loadSettings(){
+  const s=JSON.parse(localStorage.snakeSettings||"{}");
+  if(s.theme)document.getElementById("theme").value=s.theme;
+  if(s.difficulty)document.getElementById("difficulty").value=s.difficulty;
+  if(s.wrap)document.getElementById("wrap").checked=s.wrap;
+  if(s.maze)document.getElementById("maze").checked=s.maze;
+  if(s.arena)document.getElementById("arena").value=s.arena;
+}
+function saveSettings(){
+  localStorage.snakeSettings=JSON.stringify({
+    theme:themeSelect.value,
+    difficulty:difficulty.value,
+    wrap:wrap.checked,
+    maze:maze.checked,
+    arena:arena.value
+  });
+}
+
+const themeSelect=document.getElementById("theme");
+const difficulty=document.getElementById("difficulty");
+const wrap=document.getElementById("wrap");
+const maze=document.getElementById("maze");
+const arena=document.getElementById("arena");
+
+[themeSelect,difficulty,wrap,maze,arena].forEach(el=>{
+  el.addEventListener("change",saveSettings);
+});
+
+loadSettings();
+
+// ==== PARTICLES ====
+function spawnParticles(x,y,color){
+  for(let i=0;i<10;i++){
+    particles.push({
+      x,y,
+      vx:(Math.random()-0.5)*3,
+      vy:(Math.random()-0.5)*3,
+      life:20,
+      color
+    });
+  }
+}
+
+function drawParticles(){
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x,p.y,3,3);
+    p.x+=p.vx;
+    p.y+=p.vy;
+    p.life--;
+  });
+}
+
+// ==== THEMES ====
+function themeColors(){
+  let t=themeSelect.value;
+  if(t==="neon") return {snake:"#0ff",food:"#f0f",border:"#0ff"};
+  if(t==="retro") return {snake:"#7CFC00",food:"#FF4500",border:"#FFD700"};
+  if(t==="ice") return {snake:"#9ff",food:"#0ff",border:"#9ff"};
+  return {snake:"#0f0",food:"red",border:"#0f0"};
+}
+
+// ==== SKINS ====
+function snakeColor(base){
+  let skin=document.getElementById("skin").value;
+  if(skin==="gold" && score>=20) return "#FFD700";
+  if(skin==="rainbow" && score>=40){
+    return `hsl(${(Date.now()/10)%360},100%,50%)`;
+  }
+  return base;
+}
+
+// ==== ARENAS ====
+function arenaWalls(){
+  let a=arena.value;
+  if(a==="cross"){
+    let arr=[];
+    for(let i=0;i<20;i++){
+      arr.push({x:200,y:i*20});
+      arr.push({x:i*20,y:200});
+    }
+    return arr;
+  }
+  if(a==="box"){
+    let arr=[];
+    for(let i=4;i<16;i++){
+      arr.push({x:i*20,y:120});
+      arr.push({x:i*20,y:260});
+      arr.push({x:120,y:i*20});
+      arr.push({x:260,y:i*20});
+    }
+    return arr;
+  }
+  return [];
+}
+
+function randomTile(){
+  return{
+    x:Math.floor(Math.random()*20)*box,
+    y:Math.floor(Math.random()*20)*box
+  };
+}
+
+// ==== ACHIEVEMENTS ====
+function updateAchievements(){
+  document.getElementById("a10").className = score>=10? "unlocked":"locked";
+  document.getElementById("a25").className = score>=25? "unlocked":"locked";
+  document.getElementById("a50").className = score>=50? "unlocked":"locked";
+}
+
+// ==== GAME CONTROL ====
+function resetGame(){
+  snake=[{x:200,y:200}];
+  dir="RIGHT";
+  score=0;
+  particles=[];
+  document.getElementById("score").innerText=0;
+  food=randomTile();
+  clearInterval(loop);
+  let sp=Number(difficulty.value);
+  loop=setInterval(draw,sp);
+}
+
+function togglePause(){paused=!paused;}
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowUp"&&dir!=="DOWN")dir="UP";
+  if(e.key==="ArrowDown"&&dir!=="UP")dir="DOWN";
+  if(e.key==="ArrowLeft"&&dir!=="RIGHT")dir="LEFT";
+  if(e.key==="ArrowRight"&&dir!=="LEFT")dir="RIGHT";
+});
+
+// ==== DRAW LOOP ====
+function draw(){
+  if(paused)return;
+
+  let theme=themeColors();
+  canvas.style.borderColor=theme.border;
+
+  ctx.fillStyle="black";
+  ctx.fillRect(0,0,400,400);
+
+  // draw walls
+  let walls = arenaWalls();
+  ctx.fillStyle="#555";
+  walls.forEach(w=>ctx.fillRect(w.x,w.y,box,box));
+
+  // food
+  ctx.fillStyle=theme.food;
+  ctx.fillRect(food.x,food.y,box,box);
+
+  let head={...snake[0]};
+  if(dir==="LEFT")head.x-=box;
+  if(dir==="RIGHT")head.x+=box;
+  if(dir==="UP")head.y-=box;
+  if(dir==="DOWN")head.y+=box;
+
+  // wrap mode
+  if(!wrap.checked){
+    if(head.x<0||head.x>=400||head.y<0||head.y>=400){
+      resetGame(); return;
+    }
+  } else {
+    if(head.x<0)head.x=380;
+    if(head.x>380)head.x=0;
+    if(head.y<0)head.y=380;
+    if(head.y>380)head.y=0;
+  }
+
+  // wall collision
+  for(let w of walls){
+    if(head.x===w.x&&head.y===w.y){
+      resetGame(); return;
+    }
+  }
+
+  // self collision
+  for(let s of snake){
+    if(head.x===s.x&&head.y===s.y){
+      resetGame(); return;
+    }
+  }
+
+  snake.unshift(head);
+
+  // eat food
+  if(head.x===food.x&&head.y===food.y){
+    score++;
+    document.getElementById("score").innerText=score;
+    if(score>best){
+      best=score;
+      localStorage.snakeBest=best;
+      document.getElementById("best").innerText=best;
+    }
+    spawnParticles(head.x,head.y,theme.food);
+    updateAchievements();
+    food=randomTile();
+  } else snake.pop();
+
+  // draw snake
+  ctx.fillStyle=snakeColor(theme.snake);
+  snake.forEach(p=>ctx.fillRect(p.x,p.y,box,box));
+
+  drawParticles();
+}
+
+resetGame();
+</script>
+
+</body>
+</html>
