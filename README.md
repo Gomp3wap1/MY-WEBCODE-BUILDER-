@@ -10,11 +10,10 @@ FORSALE FULL SOURCE CODE OF :
 
 PRICE : $10 Pay Via Paypal
 library of Movies And Tvshows (Automatad)
-https://wapistan.vercel.app/ (check the sites features)
+For demo only no htps thisbis freehosting only all code is fully integrated by me
+http://wapistan.shop/ (check the sites features)
 
-PRICE : $10 Pay Via Paypal
-Anime And Manga Explorrer Library (Automated)
-https://jikan2.vercel.app
+
 
 
 
