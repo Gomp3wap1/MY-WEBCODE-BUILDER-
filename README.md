@@ -6,13 +6,6 @@ Back-End: Node.js, PHP, Laravel – developing scalable and secure server-side a
 
 Other Skills: Python – for scripting, automation, and backend solutions.
 
-FORSALE FULL SOURCE CODE OF : 
-
-PRICE : $10 Pay Via Paypal
-library of Movies And Tvshows (Automatad)
-For demo only no htps thisbis freehosting only all code is fully integrated by me
-http://wapistan.shop/ (check the sites features)
-
 
 
 
